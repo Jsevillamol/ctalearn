@@ -7,45 +7,27 @@ Created on Sat Oct 27 10:22:03 2018
 """
 
 import yaml, argparse
+from contextlib import redirect_stdout
 
 from tensorflow.python.keras.models import Model
 from tensorflow.python.keras.layers import Input 
 from tensorflow.python.keras.layers import Conv2D, MaxPooling2D, Flatten
 from tensorflow.python.keras.layers import TimeDistributed, LSTM
 from tensorflow.python.keras.layers import Dense
-from tensorflow.python.keras.layers import BatchNormalization, Dropout
+from tensorflow.python.keras.layers import BatchNormalization
 
-def build_model(config):
+def build_model(
+        input_shape, 
+        num_classes, 
+        activation_function, 
+        dropout_rate,
+        use_batchnorm,
+        cnn_layers,
+        lstm_units,
+        fcn_layers):
     """
-    Builds a CNN-RNN-FCN model according to the specs in model_config.
+    Builds a CNN-RNN-FCN model according to some specs
     """
-    # Extract config options
-    input_shape = config.get('input_shape', (None, 120, 120, 1))
-    num_classes = config.get('num_classes', 2)
-    
-    activation_function = config.get('activation_function', 'relu')
-    
-    use_dropout = config.get('use_dropout', False)
-    dropout_rate = config.get('dropout_rate', 0.8)
-
-    use_batchnorm = config.get('use_batchnorm', False)
-    
-    cnn_layers = config.get('cnn_layers', 
-                [
-                    {'filters':32, 'kernel_size':3, 'use_maxpool':False},
-                    {'filters':64, 'kernel_size':3, 'use_maxpool':True}
-                ])    
-    
-    lstm_units = config.get('lstm_units', 100)
-    
-    fcn_layers = config.get('fcn_layers', [
-                    {'units': 100},
-                    {'units': 100}
-                ])
-    
-    optimizer = config.get('optimizer', 'rsmprop')
-    loss = config.get('loss', 'categorical_crossentropy')
-    metrics = config.get('metrics', ['acc'])
 
     # Build a model with the functional API
     inputs = Input(input_shape)
@@ -123,7 +105,7 @@ def build_model(config):
             kernel_constraint=None, 
             recurrent_constraint=None, 
             bias_constraint=None, 
-            dropout=0.0, 
+            dropout=dropout_rate, 
             recurrent_dropout=0.0, 
             implementation=1, 
             return_sequences=False, 
@@ -132,9 +114,6 @@ def build_model(config):
             stateful=False, 
             unroll=False
         )(x)
-
-    if use_dropout:
-        x = Dropout(dropout_rate)(x)
     
     # FCN classifier    
     for fcn_layer in fcn_layers:
@@ -161,11 +140,6 @@ def build_model(config):
     # Build model
     model = Model(inputs=inputs, outputs=prediction)
     
-    # Compile the model for training
-    model.compile(optimizer, loss, metrics)
-    
-    model.summary()
-    
     return model
 
 if __name__=="__main__":
@@ -183,7 +157,14 @@ if __name__=="__main__":
     with open(args.config_file, 'r') as config_file:
         config = yaml.load(config_file)
         
-    model = build_model(config)
+    model = build_model(**config['model_config'])
+    
+    # Show model summary through console and then save it to file
+    model.summary()
+
+    with open('model_summary.txt', 'w') as f:
+        with redirect_stdout(f):
+            model.summary()
     
     # save model architecture to disk in .h5 format
-    model.save('model.h5')
+    model.save('untrained_model.h5', include_optimizer=False)

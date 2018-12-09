@@ -104,9 +104,10 @@ class ImageMapper():
         :return pix_pos_table:
         """
         if tel_type in ImageMapper.supported_telescopes: 
-            relative_fn = "pixel_pos_files/{}_pos.npy".format(tel_type)
+            #relative_fn = "pixel_pos_files/{}_pos.npy".format(tel_type)
             #TODO fix this hardcoding
-            infile = os.path.join(os.path.dirname(__file__), relative_fn) 
+            #infile = os.path.join(os.path.dirname(__file__), relative_fn) 
+            infile = "/home/jsevilla/ctalearn_keras/ctalearn/data/pixel_pos_files/{}_pos.npy".format(tel_type)
             return np.load(infile)
         else:
             logging.error(f"Telescope type {tel_type} isn't supported.")
