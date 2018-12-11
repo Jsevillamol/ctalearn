@@ -14,7 +14,7 @@ from tensorflow.python.keras.layers import Input
 from tensorflow.python.keras.layers import Conv2D, MaxPooling2D, Flatten
 from tensorflow.python.keras.layers import TimeDistributed, LSTM
 from tensorflow.python.keras.layers import Dense
-from tensorflow.python.keras.layers import BatchNormalization
+from tensorflow.python.keras.layers import BatchNormalization, Dropout
 
 def build_model(
         input_shape, 
@@ -24,6 +24,7 @@ def build_model(
         use_batchnorm,
         cnn_layers,
         lstm_units,
+        concat_lstm_output,
         fcn_layers):
     """
     Builds a CNN-RNN-FCN model according to some specs
@@ -34,7 +35,7 @@ def build_model(
     x = inputs
 
     # CNN feature extractor    
-    for cnn_layer in cnn_layers:
+    for i, cnn_layer in enumerate(cnn_layers):
         # Extract layer params
         filters = cnn_layer['filters']
         kernel_size = cnn_layer['kernel_size']
@@ -57,7 +58,7 @@ def build_model(
                 activity_regularizer=None, 
                 kernel_constraint=None, 
                 bias_constraint=None
-            ))(x)
+            ), name=f'conv2D_{i}')(x)
         
         if use_batchnorm:
             x = TimeDistributed(BatchNormalization(
@@ -74,7 +75,7 @@ def build_model(
                     gamma_regularizer=None, 
                     beta_constraint=None, 
                     gamma_constraint=None
-                ))(x)
+                ), name=f'batchnorm_{i}')(x)
 
         
         # add maxpool if needed
@@ -84,9 +85,10 @@ def build_model(
                     strides=None, 
                     padding='valid', 
                     data_format=None
-                ))(x)
+                ), name=f'maxpool_{i}')(x)
     
-    x = TimeDistributed(Flatten())(x)
+    x = TimeDistributed(Flatten(), name='flatten')(x)
+    x = TimeDistributed(Dropout(dropout_rate), name='dropout')(x)
 
     # LSTM feature combinator
     x = LSTM(
@@ -133,6 +135,8 @@ def build_model(
                 kernel_constraint=None, 
                 bias_constraint=None
             )(x)
+        
+        x = Dropout(dropout_rate)(x)
 
     
     prediction = Dense(num_classes, activation='softmax')(x)

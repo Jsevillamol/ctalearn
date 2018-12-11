@@ -15,12 +15,15 @@ class DataProcessor():
     Preprocesses images and events
     """
     def __init__(self, 
-                 dataset_metadata = None,
-                 normalization='log_normalization',
-                 resize_mode='interpolate',
-                 event_order=None,
-                 max_imgs_per_seq=10,
-                 sequence_padding='post'):
+                 normalization,
+                 resize_mode,
+                 event_order,
+                 min_imgs_per_seq,
+                 max_imgs_per_seq,
+                 sequence_padding,
+                 sequence_truncating,
+                 dataset_metadata = None
+                 ):
         """
         :param config: 
             Python dict with the following entries
@@ -38,10 +41,12 @@ class DataProcessor():
         
         # Set event preprocessing options
         self._event_order = event_order
-        self._max_imgs_per_seq = max_imgs_per_seq
         
         # Set batch preprocessing options
+        self._min_imgs_per_seq = min_imgs_per_seq
+        self._max_imgs_per_seq = max_imgs_per_seq
         self._sequence_padding = sequence_padding
+        self._sequence_truncating = sequence_truncating
         
     ###########################################
     # Image preprocessing
@@ -79,8 +84,6 @@ class DataProcessor():
         # using skimage
         img = resize(img, target_size)
         return img
-    
-    
         
     ############################################
     # Event preprocessing
@@ -95,9 +98,6 @@ class DataProcessor():
         """
         # TODO reorder event images
         
-        # Only pick first n events
-        event = event[:self._max_imgs_per_seq]
-        
         # Stack events
         event = np.stack(event)
 
@@ -107,13 +107,17 @@ class DataProcessor():
     # Batch preprocessing
     #############################################
     
-    def preprocess_batch(self, batch):
+    def preprocess_event_batch(self, batch):
         """
-        :param batch: list of event sequences, each with shape (seq, img_w, img_h, channels)
+        :param batch: list with len batch_size of event sequences, each with shape (seq, img_w, img_h, channels)
         :returns batch: np.array of shape (batch_size, max_seq, img_w, img_h, channels)
         """
         # pad sequences
-        batch = pad_sequences(batch, padding=self._sequence_padding)
+        max_len = max([len(seq) for seq in batch])
+        target_len = np.clip(max_len, self._min_imgs_per_seq, self._max_imgs_per_seq)
+        batch = pad_sequences(batch, target_len, 
+                              padding=self._sequence_padding,
+                              truncating=self._sequence_truncating)
         
         return batch
 

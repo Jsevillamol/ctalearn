@@ -6,8 +6,6 @@ Created on Mon Oct 29 09:26:11 2018
 @author: jsevillamol
 """
 
-import json
-
 import functools
 import tensorflow as tf
 

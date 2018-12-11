@@ -33,6 +33,7 @@ class DataManager():
                  preprocessing_config = {},
                  img_size=(120,120), 
                  channels=['image_charge'],
+                 data_type='array',
                  selected_tel_types=['LST']
                  ):
         """
@@ -49,6 +50,7 @@ class DataManager():
         # Set class fields
         self._img_size = img_size
         self._channels = channels
+        self._data_type = data_type
         
         self._selected_tel_types = selected_tel_types
         self._keep_telescope_position = False #TODO choose better name
@@ -71,7 +73,7 @@ class DataManager():
         
         # Initialize ImageMapper and DataProcessor
         self._imageMapper = ImageMapper(**image_mapping_config)
-        self._dataProcessor = DataProcessor(self.dataset_metadata, **preprocessing_config)
+        self._dataProcessor = DataProcessor(dataset_metadata = self.dataset_metadata, **preprocessing_config)
         
         # Logging end of initialization
         t_end = time.time()
@@ -259,11 +261,15 @@ class DataManager():
         :param example_id: unique identifier of an example
         :returns data: 
         :returns labels:
-        """            
-        # Get and stack img data, padding shorter sequences with 0 values
-        imgs = [self._get_event_imgs(example_idx) for example_idx in batch_idxs]
-        data = self._dataProcessor.preprocess_batch(imgs)
-        
+        """
+        if self._data_type == 'array':
+            # Get and stack img data, padding shorter sequences with 0 values
+            events = [self._get_event_imgs(example_idx) for example_idx in batch_idxs]
+            data = self._dataProcessor.preprocess_event_batch(events)
+        elif self._data_type == 'single_tel':
+            imgs = [self._get_image(img_id) for img_id in batch_idxs]
+            data = np.stack(imgs)
+            
         # Get and stack labels
         labels = [self._get_labels(example_idx) for example_idx in batch_idxs]
         labels = np.stack(labels)
@@ -340,12 +346,16 @@ class DataManager():
 
         return trace
 
-    def _get_labels(self, event_id):
+    def _get_labels(self, obj_id):
         """
-        :param event_id: id identifying a unique event in index_df
+        :param event_id: id identifying a unique event in event_df or image_df
         :returns labels: list of labels per example
         """
-        class_name = self._event_index_df.at[event_id,'class_name']
+        if self._data_type == 'array':
+            class_name = self._event_index_df.at[obj_id,'class_name']
+        elif self._data_type == 'single_tel':
+            class_name = self._image_index_df.at[obj_id,'class_name']
+        
         class_label = self._class_name_to_class_label[class_name]
         one_hot_label = to_categorical(class_label, len(self._classes))
         
@@ -370,7 +380,11 @@ class DataManager():
         :return val_gen: _DataSequence object wrapping the validation set
         """
         # Split the dataset into train and validation sets
-        n_examples = len(self._event_index_df)
+        if self._data_type == 'array':
+            n_examples = len(self._event_index_df)
+        elif self._data_type == 'single_tel':
+            n_examples = len(self._image_index_df)
+        
         train_idxs, val_idxs = self._create_split_idxs(n_examples, val_split, seed)
         
         # Create DataGenerator objects wrapping the train and val sets
@@ -415,7 +429,10 @@ class DataManager():
         Returns a DataGenerator object of the whole dataset for prediction
         """
         # Create indices
-        idxs = np.array(range(len(self._data_index_df)))
+        if self._data_type == 'array':
+            idxs = np.array(range(len(self._data_index_df)))
+        elif self._data_type == 'single_tel':
+            idxs = np.array(range(len(self._image_index_df)))
         
         # Create _DataSequence
         pred_gen = _DataGenerator(self, idxs, batch_size, shuffle=False)
@@ -476,18 +493,16 @@ PARTICLE_ID_TO_CLASS_NAME = {0 : 'gamma', 101 : 'proton'}
     
 if __name__=='__main__':
     logging.basicConfig(level=logging.INFO)
-    fn = '/home/jsevillamol/Documentos/datasample/sample_files.txt'
-    dataManager = DataManager(fn)
+    # fn = '/home/jsevillamol/Documentos/datasample/sample_files.txt'
+    fn = '/data2/deeplearning/ctlearn/tests/prototype_files_class_balanced.txt'
+    dataManager = DataManager(fn, data_type='single_tel')
     print(dataManager.dataset_metadata.__dict__)
     
     train_gen, val_gen = dataManager.get_train_val_gen(seed=1111)
     
     print(len(train_gen))
-    assert(len(train_gen) == 9)
         
     X,y = train_gen[0]
     
     print(X.shape)
-    assert(X.shape == (32,4,120,120,1))
     print(y.shape)
-    assert(y.shape == (32,2))

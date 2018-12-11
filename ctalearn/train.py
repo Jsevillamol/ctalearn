@@ -16,13 +16,15 @@ import itertools
 import matplotlib.pyplot as plt
 plt.switch_backend('agg')
 
+from tensorflow.python.keras.models import load_model
 from tensorflow.python.keras.callbacks import TensorBoard, ModelCheckpoint, EarlyStopping, CSVLogger
+from tensorflow.python.keras.optimizers import Adam
 
 from ctalearn.build_model import build_model
 from ctalearn.keras_utils import auroc
 from ctalearn.data.data_loading import DataManager
 
-def train(config, train_dir='.'):
+def train(config, model_file=None, train_dir='.'):
         
     # Set up training options    
     train_config = config['train_config']
@@ -33,7 +35,7 @@ def train(config, train_dir='.'):
     shuffle = train_config.get('shuffle')
     epochs = train_config.get('epochs')
     
-    optimizer = train_config.get('optimizer')
+    optimizer = train_config.get('optimizer')    
     loss = train_config.get('loss')
     metrics_names = train_config.get('metrics')
     
@@ -45,18 +47,14 @@ def train(config, train_dir='.'):
     # Get time stamp of start of training 
     # to generate unique names for the outputs of the run
     time_stamp = time.strftime('%Y%m%d_%H%M%S')
-    
-    # Set up logging
-    log_file = f"{train_dir}/session_{time_stamp}.log"
-    logging.basicConfig(level=logging.INFO, filename=log_file)
-    consoleHandler = logging.StreamHandler(os.sys.stdout)
-    logging.getLogger().addHandler(consoleHandler)
-    logging.info(f"Starting training session {time_stamp}")
         
     # Load model
-    logging.info('Building model from configuration file.')
-    model = build_model(**model_config)
-    logging.info('New model built')
+    if model_file == None:
+        logging.info('Building model from configuration file.')
+        model = build_model(**model_config)
+    else:
+        logging.info(f'Loading model from file {model_file}')
+        model = load_model(model_file)
     
     # Show model summary through console and then save it to file
     model.summary()
@@ -69,12 +67,16 @@ def train(config, train_dir='.'):
     metric_dict = {'acc':'acc', 'auc':auroc}
     metrics = [metric_dict[metric] for metric in metrics_names]
     
+    # Prepare optimizer
+    if optimizer == 'adam':
+        learning_rate = train_config['learning_rate']
+        decay = train_config['decay']
+        eps = train_config['epsilon']
+        optimizer = Adam(lr=learning_rate, beta_1=0.9, beta_2=0.999, epsilon=eps, decay=decay, amsgrad=False)
+    
     # Compile model
     model.compile(optimizer, loss, metrics)
     logging.info("Model compiled")
-    
-    # TODO Load previous history
-    initial_epoch = 0
     
     # Callbacks
     callbacks = []
@@ -133,7 +135,7 @@ def train(config, train_dir='.'):
                 train_generator, 
                 steps_per_epoch=None, # One epoch = whole dataset by default
                 epochs=epochs,
-                verbose=1, 
+                verbose=1, # Show progress bar per epoch
                 callbacks=callbacks, 
                 validation_data=val_generator, 
                 validation_steps=None, 
@@ -142,7 +144,7 @@ def train(config, train_dir='.'):
                 workers=1, 
                 use_multiprocessing=False, 
                 shuffle=shuffle, 
-                initial_epoch=initial_epoch
+                initial_epoch=0
                 )
     t_end = time.time()
     logging.info("Training finished!")
@@ -154,8 +156,6 @@ def train(config, train_dir='.'):
     # Save architecture, weights, training configuration and optimizer state
     model_fn = f'{train_dir}/model_{time_stamp}.h5'
     model.save(model_fn)
-    
-    # TODO Update prev history
     
     # Plot training history
     # summarize history for loss
@@ -184,6 +184,12 @@ def train(config, train_dir='.'):
     json.dump(history.history, open(history_fn, mode='w'))
     
 def make_combinations(config):
+    """ Generate the multiple YAML configurations on which we will call the training procedure
+    
+    # Argument
+        config: yaml configuration with a multi_config section
+    
+    """
     multi_config = config.pop('multi_config')
     
     # Flatten multi_config
@@ -210,8 +216,20 @@ if __name__ == "__main__":
     parser.add_argument(
             'config_file',
             help="path to YAML file containing a training and data configuration")
+    parser.add_argument(
+            'model_file',
+            nargs='?',
+            default=None,
+            help="path to H5 file containing a keras model. If not specified, the model will be built from the configuration")
     
     args = parser.parse_args()
+
+    # Set up logging
+    log_file = f"session.log"
+    logging.basicConfig(level=logging.INFO, filename=log_file)
+    consoleHandler = logging.StreamHandler(os.sys.stdout)
+    logging.getLogger().addHandler(consoleHandler)
+    logging.info(f"Starting training session")
     
     # load config file
     with open(args.config_file, 'r') as config_file:
@@ -222,7 +240,7 @@ if __name__ == "__main__":
     
     if multi_config == None:
         # There are no multiple configurations to try
-        train(config)
+        train(config, args.model_file)
     else:
         # If there are multiple configuration values to try
         for run_number, config in enumerate(make_combinations(config)):
@@ -231,7 +249,8 @@ if __name__ == "__main__":
             os.mkdir(train_dir)
             with open(f'{train_dir}/run{run_number}_config.yaml', 'w') as f:
                 yaml.dump(config, f)
-            train(config, train_dir)
+            logging.info(f'Starting run number {run_number}')
+            train(config, args.model_file, train_dir)
     
     
 
