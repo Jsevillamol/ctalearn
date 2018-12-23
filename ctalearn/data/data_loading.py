@@ -68,7 +68,6 @@ class DataManager():
         self.dataset_metadata = self._compute_dataset_metadata()
         
         # Load telescope array info
-        self._load_telescope_array_info_()
         self.tel_array_metadata = self._compute_telescope_array_metadata()
         
         # Initialize ImageMapper and DataProcessor
@@ -160,6 +159,7 @@ class DataManager():
                                 'filename': fn,
                                 'tel_type': tel_type,
                                 'img_row': img_row,
+                                'event_index': len(event_index),
                                 'class_name': class_name,
                                 'min_energy': min_energy,
                                 'max_energy': max_energy
@@ -205,11 +205,11 @@ class DataManager():
                               This allows us to compute metadata for the train / val sets
         :return metadata: container object whose fields store information about the dataset
         """
-        if event_indices != None:
+        if event_indices is not None and self._data_type == 'array':
             # Select chosen rows of event and image index
-            event_index_df = self._event_index_df[event_indices]
-            image_indices = event_index_df.img_indices.apply(sum, axis=1)
-            image_index_df = self._image_index_df[image_indices] # TODO
+            event_index_df = self._event_index_df.ix[event_indices]
+            image_indices = event_index_df.image_indices.sum()
+            image_index_df = self._image_index_df.ix[image_indices] # TODO
         else:
             # Use the whole dataset
             event_index_df = self._event_index_df
@@ -231,22 +231,25 @@ class DataManager():
         
         return metadata
         
-    def _load_telescope_array_info_(self):
-        # TODO
+    
+    def _compute_telescope_array_metadata(self):
+        # Create empty object to hold the relevant information
+        tel_array_metadata = type('', (), {})()
+        tel_array_metadata.n_telescopes_per_type = {}
+        tel_array_metadata.max_telescope_position = [0,0,0]
+        
         # all files contain the same array information
         f = next(iter(self.files.values()))
         
         for row in f.root.Array_Info.iterrows():
-            pass
-    
-    def _compute_telescope_array_metadata(self):
-        # TODO
-        # Create empty object to hold the relevant information
-        tel_array_metadata = type('', (), {})()
-        
-        
-        tel_array_metadata.n_telescopes_per_type = {}
-        tel_array_metadata.max_telescope_position = [0,0,0]
+            tel_type = row['tel_type']
+            if tel_type not in tel_array_metadata.n_telescopes_per_type:
+                tel_array_metadata.n_telescopes_per_type[tel_type] = 0
+            tel_array_metadata.n_telescopes_per_type[tel_type] += 1
+            tel_pos = row['tel_x'], row['tel_y'], row['tel_z']
+            for i in range(3):
+                if tel_array_metadata.max_telescope_position[i] < tel_pos[i]:
+                    tel_array_metadata.max_telescope_position[i] = tel_pos[i]
         
         return tel_array_metadata
 
@@ -348,7 +351,7 @@ class DataManager():
 
     def _get_labels(self, obj_id):
         """
-        :param event_id: id identifying a unique event in event_df or image_df
+        :param obj_id: id identifying a unique entry in event_df or image_df
         :returns labels: list of labels per example
         """
         if self._data_type == 'array':
@@ -366,7 +369,7 @@ class DataManager():
     # DATA SEQUENCE GETTERS
     ###################################
 
-    def get_train_val_gen(self, val_split=0.1, seed=None, batch_size=32, shuffle=False):
+    def get_train_val_gen_(self, train_split=0.9, val_split=0.1, seed=None, batch_size=32, shuffle=False):
         """
         Returns a train and a validation _DataGenerator object to be fed to 
         model.fit_generator()
@@ -385,16 +388,20 @@ class DataManager():
         elif self._data_type == 'single_tel':
             n_examples = len(self._image_index_df)
         
-        train_idxs, val_idxs = self._create_split_idxs(n_examples, val_split, seed)
+        train_idxs, val_idxs = self._create_split_idxs(n_examples, train_split, val_split, seed)
         
         # Create DataGenerator objects wrapping the train and val sets
         train_gen = _DataGenerator(self, train_idxs, batch_size, shuffle)
         val_gen   = _DataGenerator(self, val_idxs,   batch_size, shuffle=False)
         
+        # Create metadata objects
+        self.train_metadata = self._compute_dataset_metadata(train_idxs)
+        self.val_metadata = self._compute_dataset_metadata(val_idxs)
+        
         return train_gen, val_gen
     
     @staticmethod
-    def _create_split_idxs(index_size, val_split=0.1, seed=None):
+    def _create_split_idxs(index_size, train_split=0.9, val_split=0.1, seed=None):
         """
         Creates indices for the train and validation set
         :param data_index_df: 
@@ -404,8 +411,12 @@ class DataManager():
         :returns val_idxs:
         """
         # Check that 0 < split < 1
+        if train_split < 0 or 1 < train_split:
+            raise ValueError("Invalid train split: {}. Must be between 0.0 and 1.0".format(val_split))
         if val_split < 0 or 1 < val_split:
             raise ValueError("Invalid validation split: {}. Must be between 0.0 and 1.0".format(val_split))
+        if 1 < train_split + val_split:
+            raise ValueError("Train + val split = {}. Must be between 0.0 and 1.0".format(train_split + val_split))
         
         # seed the random generator
         if seed != None:
@@ -418,9 +429,10 @@ class DataManager():
         np.random.shuffle(idxs)
         
         # split the indices
-        split_idx = round(val_split * index_size)
-        train_idxs = idxs[:split_idx]
-        val_idxs = idxs[split_idx:]
+        train_split_idx = round(train_split * index_size)
+        val_split_idx = train_split_idx + round(val_split * index_size)
+        train_idxs = idxs[:train_split_idx]
+        val_idxs = idxs[train_split_idx:val_split_idx]
 
         return train_idxs, val_idxs
     

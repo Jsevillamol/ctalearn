@@ -29,6 +29,7 @@ def train(config, model_file=None, train_dir='.'):
     # Set up training options    
     train_config = config['train_config']
     
+    train_split = train_config.get('train_split')
     val_split = train_config.get('val_split')
     seed = train_config.get('seed')
     batch_size = train_config.get('batch_size')
@@ -126,7 +127,10 @@ def train(config, model_file=None, train_dir='.'):
 
     # Get train and validation generators
     train_generator, val_generator = \
-        dataManager.get_train_val_gen(val_split, seed, batch_size, shuffle)
+        dataManager.get_train_val_gen_(train_split, val_split, seed, batch_size, shuffle)
+    
+    logging.info(dataManager.train_metadata.__dict__)
+    logging.info(dataManager.val_metadata.__dict__)
     
     # Train the model
     logging.info("Starting training")

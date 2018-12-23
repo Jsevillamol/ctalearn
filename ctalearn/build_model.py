@@ -110,12 +110,15 @@ def build_model(
             dropout=dropout_rate, 
             recurrent_dropout=0.0, 
             implementation=1, 
-            return_sequences=False, 
+            return_sequences=concat_lstm_output, 
             return_state=False, 
             go_backwards=False, 
             stateful=False, 
             unroll=False
         )(x)
+    
+    if concat_lstm_output:
+        x = Flatten()(x)
     
     # FCN classifier    
     for fcn_layer in fcn_layers:
