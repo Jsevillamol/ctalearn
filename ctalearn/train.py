@@ -36,11 +36,19 @@ def train(config, model_file=None, train_dir='.'):
     shuffle = train_config.get('shuffle')
     epochs = train_config.get('epochs')
     
-    optimizer = train_config.get('optimizer')    
+    optimizer = train_config.get('optimizer')  
+    learning_rate = train_config.get('learning_rate', None)
+    decay = train_config.get('decay', None)
+    eps = train_config.get('epsilon', None)
+    
     loss = train_config.get('loss')
     metrics_names = train_config.get('metrics')
     
     stop_early = train_config.get('stop_early')
+    min_delta = train_config.get('min_delta', None)
+    patience = train_config.get('patience', None)
+    
+    class_weight = train_config.get('class_weight')
     
     data_config = config['data_config']
     model_config = config['model_config']
@@ -70,9 +78,6 @@ def train(config, model_file=None, train_dir='.'):
     
     # Prepare optimizer
     if optimizer == 'adam':
-        learning_rate = train_config['learning_rate']
-        decay = train_config['decay']
-        eps = train_config['epsilon']
         optimizer = Adam(lr=learning_rate, beta_1=0.9, beta_2=0.999, epsilon=eps, decay=decay, amsgrad=False)
     
     # Compile model
@@ -104,12 +109,12 @@ def train(config, model_file=None, train_dir='.'):
                 mode='auto', period=1)
         callbacks.append(checkpoint_cb)
     
-    if stop_early:
-        # Monitors rate of decrease and stops training if it enters a plateau
+    if stop_early is not None:
+        # Monitors rate of improvement on a chosen metric and stops training if it enters a plateau
         early_cb = EarlyStopping(
-                monitor='val_loss', 
-                min_delta=0, 
-                patience=1, 
+                monitor= stop_early, 
+                min_delta= min_delta, 
+                patience= patience, 
                 verbose=0, 
                 mode='auto')
         callbacks.append(early_cb)
@@ -122,15 +127,19 @@ def train(config, model_file=None, train_dir='.'):
     dataManager = DataManager(**data_config)
     
     # Log data manager metadata
-    logging.info(dataManager.dataset_metadata.__dict__)
-    logging.info(dataManager.tel_array_metadata.__dict__)
+    logging.info(f"dataset_metadata = {dataManager.dataset_metadata.__dict__}")
+    logging.info(f"tel_array_metadata = {dataManager.tel_array_metadata.__dict__}")
 
     # Get train and validation generators
     train_generator, val_generator = \
         dataManager.get_train_val_gen_(train_split, val_split, seed, batch_size, shuffle)
     
-    logging.info(dataManager.train_metadata.__dict__)
-    logging.info(dataManager.val_metadata.__dict__)
+    logging.info(f"train_metadata = {dataManager.train_metadata.__dict__}")
+    logging.info(f"val_metadata = {dataManager.val_metadata.__dict__}")
+    
+    # Set up class weights
+    if class_weight: class_weight = dataManager.train_metadata.class_weight
+    else: class_weight = None
     
     # Train the model
     logging.info("Starting training")
@@ -142,8 +151,8 @@ def train(config, model_file=None, train_dir='.'):
                 verbose=1, # Show progress bar per epoch
                 callbacks=callbacks, 
                 validation_data=val_generator, 
-                validation_steps=None, 
-                class_weight=None, 
+                validation_steps=None, # All data in val_generator is used for validation
+                class_weight=class_weight, 
                 max_queue_size=10, 
                 workers=1, 
                 use_multiprocessing=False, 

@@ -31,10 +31,11 @@ class DataManager():
     def __init__(self, file_list_fn, 
                  image_mapping_config = {},
                  preprocessing_config = {},
+                 selected_tel_types=['LST'],
+                 data_type='array',
                  img_size=(120,120), 
                  channels=['image_charge'],
-                 data_type='array',
-                 selected_tel_types=['LST']
+                 min_triggers_per_event=1
                  ):
         """
         :param file_list_fn: path to .txt file which lists paths to all .h5 files containing data
@@ -48,11 +49,12 @@ class DataManager():
         t_start = time.time()
         
         # Set class fields
+        self._selected_tel_types = selected_tel_types
+        self._data_type = data_type
         self._img_size = img_size
         self._channels = channels
-        self._data_type = data_type
         
-        self._selected_tel_types = selected_tel_types
+        self._min_triggers_per_event = min_triggers_per_event
         self._keep_telescope_position = False #TODO choose better name
         
         self._classes = list(PARTICLE_ID_TO_CLASS_NAME.values())
@@ -152,6 +154,7 @@ class DataManager():
                         energy_trace = record['image_charge']
                         min_energy = np.min(energy_trace)
                         max_energy = np.max(energy_trace)
+                        total_energy = np.sum(energy_trace)
                         
                         img_idxs.append(len(image_index))
                         
@@ -162,7 +165,8 @@ class DataManager():
                                 'event_index': len(event_index),
                                 'class_name': class_name,
                                 'min_energy': min_energy,
-                                'max_energy': max_energy
+                                'max_energy': max_energy,
+                                'total_energy' : total_energy
                                 })
                     
                     # Add global image indices to the event indices
@@ -170,7 +174,7 @@ class DataManager():
                 
                 # If there is at least one non-dummy image associated to this event
                 # add it to the event index
-                if len(event_img_idxs) > 0 and any([idx != 0 for idx in event_img_idxs]):
+                if len([idx for idx in event_img_idxs if idx != -1]) >= self._min_triggers_per_event:
                     event_index.append({
                             'filename': fn, 
                             'image_indices': event_img_idxs, 
@@ -196,7 +200,7 @@ class DataManager():
         if img_row == 0: return False
         return True #TODO
         
-    def _compute_dataset_metadata(self, event_indices=None):
+    def _compute_dataset_metadata(self, selected_indices=None):
         """
         Computes some handy data of the chosen indices of the dataset
         
@@ -205,11 +209,14 @@ class DataManager():
                               This allows us to compute metadata for the train / val sets
         :return metadata: container object whose fields store information about the dataset
         """
-        if event_indices is not None and self._data_type == 'array':
+        if selected_indices is not None and self._data_type == 'array':
             # Select chosen rows of event and image index
-            event_index_df = self._event_index_df.ix[event_indices]
+            event_index_df = self._event_index_df.ix[selected_indices]
             image_indices = event_index_df.image_indices.sum()
-            image_index_df = self._image_index_df.ix[image_indices] # TODO
+            image_index_df = self._image_index_df.ix[image_indices]
+        elif selected_indices is not None and self._data_type == 'single_tel':
+            image_index_df = self._image_index_df.ix[selected_indices]
+            event_index_df = self._event_index_df
         else:
             # Use the whole dataset
             event_index_df = self._event_index_df
@@ -228,6 +235,17 @@ class DataManager():
         
         metadata.image_charge_min = image_index_df.min_energy.min()
         metadata.image_charge_max = image_index_df.min_energy.max()
+        
+        # Class weights
+        if self._data_type == 'array':
+            count_by_class = metadata.n_events_per_class
+        elif self._data_type == 'single_tel':
+            count_by_class = metadata.n_images_per_class
+        
+        total = count_by_class.sum()
+        metadata.class_weight = \
+            {self._class_name_to_class_label[class_name]: count_by_class[class_name] / total
+            for class_name in count_by_class.keys()}
         
         return metadata
         
@@ -507,10 +525,10 @@ if __name__=='__main__':
     logging.basicConfig(level=logging.INFO)
     # fn = '/home/jsevillamol/Documentos/datasample/sample_files.txt'
     fn = '/data2/deeplearning/ctlearn/tests/prototype_files_class_balanced.txt'
-    dataManager = DataManager(fn, data_type='single_tel')
+    dataManager = DataManager(fn, data_type='array')
     print(dataManager.dataset_metadata.__dict__)
     
-    train_gen, val_gen = dataManager.get_train_val_gen(seed=1111)
+    train_gen, val_gen = dataManager.get_train_val_gen_(seed=1111, batch_size=4)
     
     print(len(train_gen))
         
@@ -518,3 +536,6 @@ if __name__=='__main__':
     
     print(X.shape)
     print(y.shape)
+    
+    print(np.max(X))
+    assert(np.any(X > 0.00001))

@@ -11,17 +11,19 @@ from contextlib import redirect_stdout
 
 from tensorflow.python.keras.models import Model
 from tensorflow.python.keras.layers import Input 
-from tensorflow.python.keras.layers import Conv2D, MaxPooling2D, Flatten
+from tensorflow.python.keras.layers import Conv2D, MaxPooling2D, Flatten, Reshape
 from tensorflow.python.keras.layers import TimeDistributed, LSTM
 from tensorflow.python.keras.layers import Dense
 from tensorflow.python.keras.layers import BatchNormalization, Dropout
+from tensorflow.python.keras.regularizers import l2
 
 def build_model(
         input_shape, 
-        num_classes, 
+        num_classes,
         activation_function, 
         dropout_rate,
         use_batchnorm,
+        l2_regularization,
         cnn_layers,
         lstm_units,
         concat_lstm_output,
@@ -29,10 +31,16 @@ def build_model(
     """
     Builds a CNN-RNN-FCN model according to some specs
     """
-
+    # Regularizer
+    l2_reg = l2(l2_regularization)
+    
     # Build a model with the functional API
     inputs = Input(input_shape)
     x = inputs
+    
+    # Reshape entry if needed
+    if len(input_shape) == 3:
+        x = Reshape([1] + input_shape)(x)
 
     # CNN feature extractor    
     for i, cnn_layer in enumerate(cnn_layers):
@@ -53,8 +61,8 @@ def build_model(
                 use_bias=True, 
                 kernel_initializer='glorot_uniform', 
                 bias_initializer='zeros', 
-                kernel_regularizer=None, 
-                bias_regularizer=None, 
+                kernel_regularizer=l2_reg, 
+                bias_regularizer=l2_reg, 
                 activity_regularizer=None, 
                 kernel_constraint=None, 
                 bias_constraint=None
@@ -76,7 +84,6 @@ def build_model(
                     beta_constraint=None, 
                     gamma_constraint=None
                 ), name=f'batchnorm_{i}')(x)
-
         
         # add maxpool if needed
         if use_maxpool:
@@ -100,9 +107,9 @@ def build_model(
             recurrent_initializer='orthogonal', 
             bias_initializer='zeros', 
             unit_forget_bias=True, 
-            kernel_regularizer=None, 
-            recurrent_regularizer=None, 
-            bias_regularizer=None, 
+            kernel_regularizer=l2_reg, 
+            recurrent_regularizer=l2_reg, 
+            bias_regularizer=l2_reg, 
             activity_regularizer=None, 
             kernel_constraint=None, 
             recurrent_constraint=None, 
@@ -132,8 +139,8 @@ def build_model(
                 use_bias=True, 
                 kernel_initializer='glorot_uniform', 
                 bias_initializer='zeros', 
-                kernel_regularizer=None, 
-                bias_regularizer=None, 
+                kernel_regularizer=l2_reg, 
+                bias_regularizer=l2_reg, 
                 activity_regularizer=None, 
                 kernel_constraint=None, 
                 bias_constraint=None
