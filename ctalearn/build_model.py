@@ -68,6 +68,15 @@ def build_model(
                 bias_constraint=None
             ), name=f'conv2D_{i}')(x)
         
+        # add maxpool if needed
+        if use_maxpool:
+            x = TimeDistributed(MaxPooling2D(
+                    pool_size=(2, 2), 
+                    strides=None, 
+                    padding='valid', 
+                    data_format=None
+                ), name=f'maxpool_{i}')(x)
+        
         if use_batchnorm:
             x = TimeDistributed(BatchNormalization(
                     axis=-1, 
@@ -84,15 +93,7 @@ def build_model(
                     beta_constraint=None, 
                     gamma_constraint=None
                 ), name=f'batchnorm_{i}')(x)
-        
-        # add maxpool if needed
-        if use_maxpool:
-            x = TimeDistributed(MaxPooling2D(
-                    pool_size=(2, 2), 
-                    strides=None, 
-                    padding='valid', 
-                    data_format=None
-                ), name=f'maxpool_{i}')(x)
+
     
     x = TimeDistributed(Flatten(), name='flatten')(x)
     x = TimeDistributed(Dropout(dropout_rate), name='dropout')(x)

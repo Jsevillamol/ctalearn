@@ -6,18 +6,26 @@ Created on Sat Oct 27 10:22:03 2018
 @author: jsevillamol
 """
 
-import os, logging
+import os, logging, signal
 import argparse, time
 from datetime import timedelta
-import yaml, json
+import yaml, csv
 from contextlib import redirect_stdout
 import itertools
+from pandas.io.json.normalize import nested_to_record
+import operator
+from functools import reduce
+from collections import MutableMapping
+from contextlib import suppress
 
 import matplotlib.pyplot as plt
 plt.switch_backend('agg')
 
+import numpy as np
+
+import tensorflow as tf
 from tensorflow.python.keras.models import load_model
-from tensorflow.python.keras.callbacks import TensorBoard, ModelCheckpoint, EarlyStopping, CSVLogger
+from tensorflow.python.keras.callbacks import Callback, TensorBoard, ModelCheckpoint, EarlyStopping, CSVLogger
 from tensorflow.python.keras.optimizers import Adam
 
 from ctalearn.build_model import build_model
@@ -49,6 +57,7 @@ def train(config, model_file=None, train_dir='.'):
     patience = train_config.get('patience', None)
     
     class_weight = train_config.get('class_weight')
+    save_model = train_config.get('save_model')
     
     data_config = config['data_config']
     model_config = config['model_config']
@@ -87,6 +96,25 @@ def train(config, model_file=None, train_dir='.'):
     # Callbacks
     callbacks = []
     
+    # Monitors the SIGINT (ctrl + C) to safely stop training when it is sent
+    flag = False
+    class SafeStop(Callback):
+        """Callback that terminates training when the flag is raised.
+        """
+        def on_epoch_end(self, batch, logs=None):
+            print("safestop callback activated")
+            if flag:    
+                self.model.stop_training = True
+                
+    def handler(signum, frame):
+        logging.info('SIGINT signal received. Training will finish after this epoch')
+        global flag
+        flag = True
+    
+    signal.signal(signal.SIGINT, handler) # We assign a specific handler for the SIGINT signal
+    safeStop = SafeStop()
+    callbacks.append(safeStop)
+    
     # Creates event files for tensorboard during training
     tensorboard_cb = TensorBoard(
             log_dir=f'{train_dir}/logs', 
@@ -120,7 +148,7 @@ def train(config, model_file=None, train_dir='.'):
         callbacks.append(early_cb)
     
     # Logs the metrics after each epoch to a csv file
-    csv_logger = CSVLogger(f'{train_dir}/training_{time_stamp}.csv')
+    csv_logger = CSVLogger(f'{train_dir}/training_history.csv')
     callbacks.append(csv_logger)
 
     # Create data manager
@@ -167,8 +195,9 @@ def train(config, model_file=None, train_dir='.'):
     logging.info(f"Time elapsed during training: {t_delta}")
 
     # Save architecture, weights, training configuration and optimizer state
-    model_fn = f'{train_dir}/model_{time_stamp}.h5'
-    model.save(model_fn)
+    if save_model:
+        model_fn = f'{train_dir}/model_{time_stamp}.h5'
+        model.save(model_fn)
     
     # Plot training history
     # summarize history for loss
@@ -192,34 +221,118 @@ def train(config, model_file=None, train_dir='.'):
         plt.savefig(f'{train_dir}/history_{metric}.png')
         plt.clf()
     
-    # Save history
-    history_fn = f'{train_dir}/history_{time_stamp}.json'
-    json.dump(history.history, open(history_fn, mode='w'))
+    # After every training session we need to clear the tf session
+    # to avoid OOM errors when running multiple training sessions
+    # one after another
+    tf.keras.backend.clear_session()
+  
+############################
+# GRID SEARCH FUNCTIONALITY 
+############################
+
+def multi_train(config, model_file=None, start_from_run=0):
+    # Process 'multi_' options
+    run_number = None
+    for run_number, config in enumerate(make_combinations(config)):
+        # Skip the runs already done in a previous session
+        if run_number < start_from_run: continue
+    
+        # Create a directory where to store the training results
+        run_number_name = str(run_number).zfill(3)
+        train_dir = f'run{run_number_name}'
+        try:
+            os.mkdir(train_dir)
+        except OSError:
+            pass
+        
+        # Save a copy of the configuration combination in the target training folder
+        with open(f'{train_dir}/run{run_number_name}_config.yaml', 'w') as f:
+            yaml.dump(config, f)
+            
+        # Launch the training session
+        logging.info(f'Starting run number {run_number_name}')
+        train(config, model_file, train_dir)
+    
+    # If no `multi_` options were found
+    if run_number is None: return 0
+    
+    # Read the results from the runs
+    total_runs = run_number + 1
+    histories = []
+    for run_number in range(total_runs):
+        run_number_name = str(run_number).zfill(3)
+        train_dir = f'run{run_number_name}'
+        csv_fn = f'{train_dir}/training_history.csv'
+        with open(csv_fn) as csv_file:
+            csv_reader = csv.reader(csv_file)
+            csv_contents = []
+            for row in csv_reader: 
+                csv_contents.append(row)
+            metric_names = csv_contents[0]
+            history = np.array(csv_contents[1:])
+            histories.append(history) 
+    
+    # Plot the runs
+    for i, metric in enumerate(metric_names):
+        plt.title(f'model {metric}')
+        plt.ylabel(metric)
+        plt.xlabel('epoch')
+        for history in histories: 
+            hist = list(map(float, history[:, i]))
+            plt.plot(hist)
+        plt.savefig(f'history_{metric}.png')
+        plt.clf()
+    
+    # Save the final results to a CSV
+    csv_fn = 'multi_summary.csv'
+    with open(csv_fn, 'w', newline='') as csvfile:
+        csv_writer = csv.writer(csvfile)
+        csv_writer.writerow(['run_number'] + metric_names)
+        for run_number, history in enumerate(histories):
+            csv_writer.writerow([run_number] + list(history[-1, :]))
+    
+    # return the number of training runs launched
+    return total_runs
     
 def make_combinations(config):
-    """ Generate the multiple YAML configurations on which we will call the training procedure
-    
-    # Argument
-        config: yaml configuration with a multi_config section
-    
     """
-    multi_config = config.pop('multi_config')
-    
-    # Flatten multi_config
-    multi_config_flat = {(section, key): value 
-                         for section in multi_config.keys() 
-                         for key,value in multi_config[section].items()}
-    
+    Generate all possible configurations that a config file specifies via 'multi_' parameters
+    If there are no 'multi_' parameters this generator is empty
+    """
+    flat = nested_to_record(config)
+    flat = { tuple(key.split('.')): value for key, value in flat.items()}
+    multi_config_flat = {key[:-1] + (key[-1][6:],) : value 
+                         for key, value in flat.items() 
+                         if key[-1].startswith('multi')}
+    if len(multi_config_flat) == 0: return # if there are no multi params this generator is empty
     keys, values = zip(*multi_config_flat.items())
     
+    # delete the multi_params
+    # taken from https://stackoverflow.com/a/49723101/4841832
+    def delete_keys_from_dict(dictionary, keys):
+        """
+        Delete fields in a nested dict
+        """
+        for key in keys:
+            with suppress(KeyError):
+                del dictionary[key]
+        for value in dictionary.values():
+            if isinstance(value, MutableMapping):
+                delete_keys_from_dict(value, keys)
+                
+    to_delete = ['multi_' + key[-1] for key in multi_config_flat]
+    delete_keys_from_dict(config, to_delete)
+    
     for values in itertools.product(*values):
-        
         experiment = dict(zip(keys, values))
-        
-        for (section, key), value in experiment.items():
-            config[section][key] = value
-            
+        for setting, value in experiment.items():
+            pointer_to_inner_dict = reduce(operator.getitem, setting[:-1], config)
+            pointer_to_inner_dict[setting[-1]] = value
         yield config
+
+########################
+# LAUNCH SCRIPT
+########################
 
 if __name__ == "__main__":
     
@@ -234,7 +347,8 @@ if __name__ == "__main__":
             nargs='?',
             default=None,
             help="path to H5 file containing a keras model. If not specified, the model will be built from the configuration")
-    
+    parser.add_argument('-s', '--start_from_run', default=0, type=int,
+                        help="What run number to start from in multi mode. Useful when a multi conf run is interrupted and you need to resume it.")
     args = parser.parse_args()
 
     # Set up logging
@@ -248,23 +362,10 @@ if __name__ == "__main__":
     with open(args.config_file, 'r') as config_file:
         config = yaml.load(config_file)
     
-    # Process multioptions
-    multi_config = config.get('multi_config', None)
-    
-    if multi_config == None:
-        # There are no multiple configurations to try
+    # Try running the multi configuration train sequence
+    run_number = multi_train(config, args.model_file, args.start_from_run)
+        
+    if run_number == 0:
+        # There are no multiple configurations to try, just call the training procedure
         train(config, args.model_file)
-    else:
-        # If there are multiple configuration values to try
-        for run_number, config in enumerate(make_combinations(config)):
-            run_number = str(run_number).zfill(2)
-            train_dir = f'run{run_number}'
-            os.mkdir(train_dir)
-            with open(f'{train_dir}/run{run_number}_config.yaml', 'w') as f:
-                yaml.dump(config, f)
-            logging.info(f'Starting run number {run_number}')
-            train(config, args.model_file, train_dir)
-    
-    
-
-    
+        
