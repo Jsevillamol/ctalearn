@@ -9,7 +9,7 @@ Created on Sat Oct 27 10:22:03 2018
 import os, logging, signal
 import argparse, time
 from datetime import timedelta
-import yaml, csv
+import yaml
 from contextlib import redirect_stdout
 import itertools
 from pandas.io.json.normalize import nested_to_record
@@ -22,13 +22,13 @@ import matplotlib.pyplot as plt
 plt.switch_backend('agg')
 
 import numpy as np
-
 import tensorflow as tf
 from tensorflow.python.keras.models import load_model
 from tensorflow.python.keras.callbacks import Callback, TensorBoard, ModelCheckpoint, EarlyStopping, CSVLogger
 from tensorflow.python.keras.optimizers import Adam
 
 from ctalearn.build_model import build_model
+from ctalearn.summarize import summarize_multi_results
 from ctalearn.keras_utils import auroc
 from ctalearn.data.data_loading import DataManager
 
@@ -61,6 +61,10 @@ def train(config, model_file=None, train_dir='.'):
     
     data_config = config['data_config']
     model_config = config['model_config']
+    
+    # Set up seeds
+    np.random.seed(seed)
+    tf.set_random_seed(seed)
     
     # Get time stamp of start of training 
     # to generate unique names for the outputs of the run
@@ -97,22 +101,24 @@ def train(config, model_file=None, train_dir='.'):
     callbacks = []
     
     # Monitors the SIGINT (ctrl + C) to safely stop training when it is sent
-    flag = False
+    
     class SafeStop(Callback):
         """Callback that terminates training when the flag is raised.
         """
+        def __init__(self): 
+            self.safestop_flag = False
         def on_epoch_end(self, batch, logs=None):
-            print("safestop callback activated")
-            if flag:    
+            if self.safestop_flag:    
                 self.model.stop_training = True
+                self.safestop_flag = False
+    safeStop = SafeStop()
                 
     def handler(signum, frame):
         logging.info('SIGINT signal received. Training will finish after this epoch')
-        global flag
-        flag = True
+        safeStop.safestop_flag = True
     
     signal.signal(signal.SIGINT, handler) # We assign a specific handler for the SIGINT signal
-    safeStop = SafeStop()
+    
     callbacks.append(safeStop)
     
     # Creates event files for tensorboard during training
@@ -256,42 +262,11 @@ def multi_train(config, model_file=None, start_from_run=0):
     # If no `multi_` options were found
     if run_number is None: return 0
     
-    # Read the results from the runs
-    total_runs = run_number + 1
-    histories = []
-    for run_number in range(total_runs):
-        run_number_name = str(run_number).zfill(3)
-        train_dir = f'run{run_number_name}'
-        csv_fn = f'{train_dir}/training_history.csv'
-        with open(csv_fn) as csv_file:
-            csv_reader = csv.reader(csv_file)
-            csv_contents = []
-            for row in csv_reader: 
-                csv_contents.append(row)
-            metric_names = csv_contents[0]
-            history = np.array(csv_contents[1:])
-            histories.append(history) 
-    
-    # Plot the runs
-    for i, metric in enumerate(metric_names):
-        plt.title(f'model {metric}')
-        plt.ylabel(metric)
-        plt.xlabel('epoch')
-        for history in histories: 
-            hist = list(map(float, history[:, i]))
-            plt.plot(hist)
-        plt.savefig(f'history_{metric}.png')
-        plt.clf()
-    
-    # Save the final results to a CSV
-    csv_fn = 'multi_summary.csv'
-    with open(csv_fn, 'w', newline='') as csvfile:
-        csv_writer = csv.writer(csvfile)
-        csv_writer.writerow(['run_number'] + metric_names)
-        for run_number, history in enumerate(histories):
-            csv_writer.writerow([run_number] + list(history[-1, :]))
+    # Summarize results
+    summarize_multi_results()
     
     # return the number of training runs launched
+    total_runs = run_number + 1
     return total_runs
     
 def make_combinations(config):
