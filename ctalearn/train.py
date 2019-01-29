@@ -59,6 +59,8 @@ def train(config, model_file=None, train_dir='.'):
     class_weight = train_config.get('class_weight')
     save_model = train_config.get('save_model')
     
+    fit_batch_first = train_config.get('fit_batch_first')
+    
     data_config = config['data_config']
     model_config = config['model_config']
     
@@ -174,6 +176,32 @@ def train(config, model_file=None, train_dir='.'):
     # Set up class weights
     if class_weight: class_weight = dataManager.train_metadata.class_weight
     else: class_weight = None
+    
+    # Pretrain the model on a single batch
+    if fit_batch_first:
+        logging.info("Fitting single batch first")
+        early_cb = EarlyStopping(
+                monitor= 'loss', 
+                min_delta= 0, 
+                patience= 1, 
+                verbose=0, 
+                mode='auto')
+        X,y = train_generator[0]
+        single_batch_history = model.fit(
+                X,y, 
+                steps_per_epoch=None, # One epoch = whole dataset by default
+                epochs=1000000,
+                verbose=1, # Show progress bar per epoch
+                callbacks=[early_cb]
+                )
+        # plot single batch progress
+        plt.plot(single_batch_history.history['loss'])
+        plt.title('model loss')
+        plt.ylabel('loss')
+        plt.xlabel('epoch')
+        plt.legend(['train'], loc='upper left')
+        plt.savefig(f'{train_dir}/history_single_batch_loss.png')
+        plt.clf()
     
     # Train the model
     logging.info("Starting training")
