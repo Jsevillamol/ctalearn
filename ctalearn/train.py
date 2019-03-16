@@ -21,6 +21,7 @@ from contextlib import suppress
 import matplotlib.pyplot as plt
 plt.switch_backend('agg')
 
+import random
 import numpy as np
 import tensorflow as tf
 from tensorflow.python.keras.models import load_model
@@ -64,7 +65,8 @@ def train(config, model_file=None, train_dir='.'):
     data_config = config['data_config']
     model_config = config['model_config']
     
-    # Set up seeds
+    # Set up random seeds
+    random.seed(seed)
     np.random.seed(seed)
     tf.set_random_seed(seed)
     
@@ -168,7 +170,7 @@ def train(config, model_file=None, train_dir='.'):
 
     # Get train and validation generators
     train_generator, val_generator = \
-        dataManager.get_train_val_gen_(train_split, val_split, seed, batch_size, shuffle)
+        dataManager.get_train_val_gen_(train_split, val_split, seed, batch_size)
     
     logging.info(f"train_metadata = {dataManager.train_metadata.__dict__}")
     logging.info(f"val_metadata = {dataManager.val_metadata.__dict__}")

@@ -387,7 +387,7 @@ class DataManager():
     # DATA SEQUENCE GETTERS
     ###################################
 
-    def get_train_val_gen_(self, train_split=0.9, val_split=0.1, seed=None, batch_size=32, shuffle=False):
+    def get_train_val_gen_(self, train_split=0.9, val_split=0.1, seed=None, batch_size=32):
         """
         Returns a train and a validation _DataGenerator object to be fed to 
         model.fit_generator()
@@ -409,8 +409,8 @@ class DataManager():
         train_idxs, val_idxs = self._create_split_idxs(n_examples, train_split, val_split, seed)
         
         # Create DataGenerator objects wrapping the train and val sets
-        train_gen = _DataGenerator(self, train_idxs, batch_size, shuffle)
-        val_gen   = _DataGenerator(self, val_idxs,   batch_size, shuffle=False)
+        train_gen = _DataGenerator(self, train_idxs, batch_size)
+        val_gen   = _DataGenerator(self, val_idxs,   batch_size)
         
         # Create metadata objects
         self.train_metadata = self._compute_dataset_metadata(train_idxs)
@@ -465,7 +465,7 @@ class DataManager():
             idxs = np.array(range(len(self._image_index_df)))
         
         # Create _DataSequence
-        pred_gen = _DataGenerator(self, idxs, batch_size, shuffle=False)
+        pred_gen = _DataGenerator(self, idxs, batch_size)
 
         return pred_gen
     
@@ -476,7 +476,7 @@ class _DataGenerator(Sequence):
     It wraps a list of indexes that reference examples.
     The actual example data is served by the DataManager.
     """
-    def __init__(self, dataManager, idxs, batch_size=32, shuffle=False):
+    def __init__(self, dataManager, idxs, batch_size=32):
         """
         :param dataManager: DataManager object, serves the examples
         :param idxs: List of the indexes of all the examples
@@ -485,7 +485,6 @@ class _DataGenerator(Sequence):
         self.dataManager = dataManager
         self.idxs = idxs
         self.batch_size = batch_size
-        self.shuffle = shuffle
     
     def __len__(self):
         """ Returns the number of batches in this Sequence """
@@ -506,11 +505,6 @@ class _DataGenerator(Sequence):
         X, y = self.dataManager._get_batch(batch_idxs)
         
         return X, y
-    
-    def on_epoch_end(self):
-        """Updates indexes after each epoch"""
-        if self.shuffle == True:
-            np.random.shuffle(self.idxs)
             
 ###############################
 #       Telescope data
