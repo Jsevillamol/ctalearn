@@ -28,9 +28,26 @@ def build_model(
         lstm_units,
         concat_lstm_output,
         fcn_layers):
-    """
-    Builds a CNN-RNN-FCN model according to some specs
-    """
+    ''' Builds a CNN-RNN-FCN classification model
+    
+    # Parameters
+        input_shape (tuple) -- expected input shape
+        num_classes (int) -- number of classes
+        activation_function (str) -- non linearity to apply between layers
+        dropout_rate (float) -- must be between 0 and 1
+        l2_regularization (float)
+        cnn_layers (list) -- list specifying CNN layers. 
+                             Each element must be of the form 
+                             {filters: 32,  kernel_size: 3, use_maxpool: true}
+        lstm_units (int) -- number of hidden units of the lstm
+        concat_lstm_output (bool) -- if True, the outputs of all LSTM cells 
+                                     are concatenated and fed to the next layer
+                                     if False, only the last output is fed to the next layer
+        fcn_layers (list) -- list specifying Dense layers
+                             example element: {units: 1024}
+    # Returns
+        model -- an uncompiled Keras model
+    '''
     # Regularizer
     l2_reg = l2(l2_regularization)
     
@@ -41,6 +58,8 @@ def build_model(
     # Reshape entry if needed
     if len(input_shape) == 3:
         x = Reshape([1] + input_shape)(x)
+    elif len(input_shape) < 3:
+        raise ValueError(f"Input shape {input_shape} not supported")
 
     # CNN feature extractor    
     for i, cnn_layer in enumerate(cnn_layers):

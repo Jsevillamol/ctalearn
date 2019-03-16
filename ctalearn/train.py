@@ -34,6 +34,22 @@ from ctalearn.keras_utils import auroc
 from ctalearn.data.data_loading import DataManager
 
 def train(config, model_file=None, train_dir='.'):
+    ''' Runs a training session according to the specifications in config
+    
+    # Parameters
+        config -- dictionary with the configuration options
+                  should contain sections 'train_config', 'data_config' and
+                  optionally 'model_config'
+        model_file -- path to .h5 file containing the keras model to be trained
+                      if None, a new model is built from the specifications
+        train_dir -- folder where results of the training will be stored
+    
+    # Creates
+        .txt summary of model architecture
+        .csv log of training history
+        .png plots of training history
+        .h5 trained Keras model (unless config['train_config']['save_model']==False)
+    '''
         
     # Set up training options    
     train_config = config['train_config']
@@ -267,6 +283,30 @@ def train(config, model_file=None, train_dir='.'):
 ############################
 
 def multi_train(config, model_file=None, start_from_run=0):
+    ''' Performs a grid search over the range of multiparameters specified in config
+    
+    # Parameters
+        config (dict) -- configuration options. Contains sections train_config, 
+                         data_config and optionally model_config.
+                         Parameters that vary in the grid search are prefixed by 'multi_'
+                         and contain a list indicating the range of possible values
+                         
+        model_file (str) -- model to be trained
+                            if None, a model will be created in each run
+                            according to the generated configuration
+        
+        start_from_run (int) -- indicates what runs to skip. Useful for resuming
+                                a multi_train session that was interrupted.
+    
+    # Returns
+        total_runs (int) -- number of runs executed. 
+                            If the config file did not contain any 'multi_'
+                            options this function returns 0
+    
+    # Creates
+        a folder for each run configuration generated, 
+        containing the training output
+    '''
     # Process 'multi_' options
     run_number = None
     for run_number, config in enumerate(make_combinations(config)):
@@ -276,6 +316,7 @@ def multi_train(config, model_file=None, start_from_run=0):
         # Create a directory where to store the training results
         run_number_name = str(run_number).zfill(3)
         train_dir = f'run{run_number_name}'
+        
         try:
             os.mkdir(train_dir)
         except OSError:
