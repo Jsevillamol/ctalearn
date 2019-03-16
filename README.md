@@ -23,9 +23,9 @@ Major changes with respect to the original repository are:
       * `model_config`, specifying how the model should be built
       * `data_config`, specifying what kind of data to load and how to preprocess it
       * `train_config`, specifying training options
-   You can check the params to be specified in each section in [`example_config.yaml`](configuration_examples/example_config.yaml).
+   You can check the params to be specified in each section in [`example_config.yaml`](example_config.yaml).
 3. Run `python PATH/TO/PROJECT/ctalearn/train.py config.yml`. The outputs of a training session are:
-      * `model.h5` file containing the results of the training
+      * `model.h5` file containing the results of the training (unless the configuration option `save_model` is set to `false`)
       * `model_summary.txt` file containing a summary of the model architecture
       * `session.log` file containing a log of messages during training
       * `training_history.csv` containing the training history
@@ -50,7 +50,7 @@ generating as many folders as possible combinations of parameters are possible.
 Each folder will contain the config file specifying what parameters were used for that run, 
 plus the usual output of a run.
 
-Additionally, the script will generate a summary of all the run results and comparative `png` plots.
+Additionally, the script will generate a `csv` summary of all the run results and comparative `png` plots.
 
 ### Generating the pixel_pos files
 In order to work properly, CTALearn relies on the generation of some files containing
