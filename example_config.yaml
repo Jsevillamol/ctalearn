@@ -2,13 +2,13 @@
 data_config:
     # file_list_fn: path to a txt file where each line is the absolute path 
     #               to a .h5 file containing information from an event
-    file_list_fn: '/data2/deeplearning/ctlearn/tests/prototype_files_class_balanced.txt'
+    file_list_fn: /data2/deeplearning/ctlearn/tests/prototype_files_class_balanced.txt
     
     # channels: list of image-like features per image that will be loaded. Supports:
-    #              'image_charge': total charge received by pixel during the event
-    #              'peak_times': time in seconds when the peak of energy occured
+    #              image_charge: total charge received by pixel during the event
+    #              peak_times: time in seconds when the peak of energy occured
     # CAUTION: ctalearn assumes that image_charge is always the first channel
-    channels: ['image_charge']
+    channels: [image_charge]
     
     # img_size: [img_width, img_length]
     img_size: [108, 108]
@@ -27,15 +27,15 @@ data_config:
     # image_mapping_config: configuration for the mapping of images to numpy arrays
     image_mapping_config:
         # hex_conversion_algorithm:
-        #     supported options: 'oversampling'
-        hex_conversion_algorithm: 'oversampling'
+        #     supported options: oversampling
+        hex_conversion_algorithm: oversampling
     
     # preprocessing_config: configuration for the preprocessing of images
     preprocessing_config:
         # normalization: apply normalization to the images.
         # Supported modes:
         #    null: no normalization
-        #    'log_normalization'
+        #    log_normalization
         normalization: null
         
         # resize_mode: method for resizing images
@@ -45,8 +45,8 @@ data_config:
         # event_order_type: order events in array mode
         # Supported modes
         #     null: no reordering
-        #     'size': order images by sum of charges
-        event_order_type: 'size'
+        #     size: order images by sum of charges
+        event_order_type: size
         
         # event_order_reverse:
         # if true, the images inside an event will be order greates to lowest
@@ -57,11 +57,11 @@ data_config:
         # max_imgs_per_seq: truncates sequences bigger than this
         max_imgs_per_seq: 4
         # indicates if padding should be added before or after the original sequence
-        # supported modes: 'post', 'pre'
-        sequence_padding: 'post'
+        # supported modes: post, pre
+        sequence_padding: post
         # indicates if padding should be added before or after the original sequence
-        # supported modes: 'post', 'pre'
-        sequence_truncating: 'post'
+        # supported modes: post, pre
+        sequence_truncating: post
                  
 # Configuration during training
 train_config:
@@ -72,7 +72,7 @@ train_config:
     seed: 1111         # seed the random generators
     shuffle: true      # shuffle training dataset between epochs
     
-    optimizer: 'adam'
+    optimizer: adam
     learning_rate: 1.0e-04
     epsilon:  1.0e-08
     decay: 0.0
@@ -80,14 +80,16 @@ train_config:
     loss: 'categorical_crossentropy'
     # metrics: List of metrics to collect during training and validation. 
     #          Supports:
-    #            acc: accuracy
+    #            acc: train accuracy
     #            auc: area under the receiving operator curve
-    metrics: ['acc', 'auc']
+    metrics: [acc, auc]
     
     # stop_early: Metric whose progress to track to perform early stopping
     #          Supports:
     #             loss: tranining loss
-    #             acc: accuracy
+    #             val_loss: validation loss
+    #             acc: training accuracy
+    #             val_acc: validation accuracy
     #             null: disable stop early
     # min_delta: minimum change in target metric that registers as an improvement 
     # patience: number of epochs without an improvement before stopping early
@@ -108,7 +110,7 @@ model_config:
     # input_shape:
     #   for array mode with concatenation of the LSTM output, use [seq_length, img_width, img_height, n_channels]
     #   for array mode without concatenation of the LSTM output, use [null, img_width, img_height, n_channels]
-    #   for single_tel mode use [img_width, img_length, n_channels]
+    #   for single_tel mode use [img_width, img_height, n_channels]
     input_shape: [4, 108, 108, 1]
     
     # num_classes: how many classes to classify
