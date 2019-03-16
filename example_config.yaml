@@ -120,7 +120,7 @@ model_config:
     activation_function: 'relu'
     # dropout_rate: fraction of units to randomly drop between layers during training for regularization
     dropout_rate: 0.0
-    # use_batchnorm: if true, adds batchnorm layers to the model
+    # use_batchnorm: if true, adds batchnorm layers between convolutions
     use_batchnorm: true
     # l2_regularization: regularization penalty to the kernel and bias of each layer
     l2_regularization: 0.0

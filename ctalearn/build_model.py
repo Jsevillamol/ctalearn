@@ -35,6 +35,7 @@ def build_model(
         num_classes (int) -- number of classes
         activation_function (str) -- non linearity to apply between layers
         dropout_rate (float) -- must be between 0 and 1
+        use_batchnorm (bool) -- if True, batchnorm layers are added between convolutions
         l2_regularization (float)
         cnn_layers (list) -- list specifying CNN layers. 
                              Each element must be of the form 
