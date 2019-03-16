@@ -40,6 +40,7 @@ def build_model(
                              Each element must be of the form 
                              {filters: 32,  kernel_size: 3, use_maxpool: true}
         lstm_units (int) -- number of hidden units of the lstm
+                            if lstm_units is None or 0 the LSTM layer is skipped
         concat_lstm_output (bool) -- if True, the outputs of all LSTM cells 
                                      are concatenated and fed to the next layer
                                      if False, only the last output is fed to the next layer
@@ -118,31 +119,32 @@ def build_model(
     x = TimeDistributed(Dropout(dropout_rate), name='dropout')(x)
 
     # LSTM feature combinator
-    x = LSTM(
-            lstm_units, 
-            activation='tanh', 
-            recurrent_activation='hard_sigmoid', 
-            use_bias=True, 
-            kernel_initializer='glorot_uniform', 
-            recurrent_initializer='orthogonal', 
-            bias_initializer='zeros', 
-            unit_forget_bias=True, 
-            kernel_regularizer=l2_reg, 
-            recurrent_regularizer=l2_reg, 
-            bias_regularizer=l2_reg, 
-            activity_regularizer=None, 
-            kernel_constraint=None, 
-            recurrent_constraint=None, 
-            bias_constraint=None, 
-            dropout=dropout_rate, 
-            recurrent_dropout=0.0, 
-            implementation=1, 
-            return_sequences=concat_lstm_output, 
-            return_state=False, 
-            go_backwards=False, 
-            stateful=False, 
-            unroll=False
-        )(x)
+    if lstm_units is not None and lstm_units > 0:
+        x = LSTM(
+                lstm_units, 
+                activation='tanh', 
+                recurrent_activation='hard_sigmoid', 
+                use_bias=True, 
+                kernel_initializer='glorot_uniform', 
+                recurrent_initializer='orthogonal', 
+                bias_initializer='zeros', 
+                unit_forget_bias=True, 
+                kernel_regularizer=l2_reg, 
+                recurrent_regularizer=l2_reg, 
+                bias_regularizer=l2_reg, 
+                activity_regularizer=None, 
+                kernel_constraint=None, 
+                recurrent_constraint=None, 
+                bias_constraint=None, 
+                dropout=dropout_rate, 
+                recurrent_dropout=0.0, 
+                implementation=1, 
+                return_sequences=concat_lstm_output, 
+                return_state=False, 
+                go_backwards=False, 
+                stateful=False, 
+                unroll=False
+            )(x)
     
     if concat_lstm_output:
         x = Flatten()(x)

@@ -131,7 +131,9 @@ model_config:
         - {filters: 32,  kernel_size: 3, use_maxpool: true}
         - {filters: 64,  kernel_size: 3, use_maxpool: true}
         - {filters: 128, kernel_size: 3, use_maxpool: true}
-
+    
+    # lstm_units: dimensionality of output of each LSTM cell
+    #             if null or 0 the LSTM is skipped
     lstm_units: 2048
     # concat_lstm_output: 
     #   if true, the output of each LSTM cell is concatenated and fed to the next layer
