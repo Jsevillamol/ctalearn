@@ -9,13 +9,9 @@ Created on Sat Oct 27 10:22:03 2018
 import yaml, argparse
 from contextlib import redirect_stdout
 
-from tensorflow.python.keras.models import Model
-from tensorflow.python.keras.layers import Input 
-from tensorflow.python.keras.layers import Conv2D, MaxPooling2D, Flatten, Reshape
-from tensorflow.python.keras.layers import TimeDistributed, LSTM
-from tensorflow.python.keras.layers import Dense
-from tensorflow.python.keras.layers import BatchNormalization, Dropout
-from tensorflow.python.keras.regularizers import l2
+from tensorflow.keras.models import Model
+import tensorflow.keras.layers as ll
+from tensorflow.keras.regularizers import l2
 
 def build_model(
         input_shape, 
@@ -26,7 +22,7 @@ def build_model(
         l2_regularization,
         cnn_layers,
         lstm_units,
-        concat_lstm_output,
+        combine_mode,
         fcn_layers):
     ''' Builds a CNN-RNN-FCN classification model
     
@@ -42,9 +38,12 @@ def build_model(
                              {filters: 32,  kernel_size: 3, use_maxpool: true}
         lstm_units (int) -- number of hidden units of the lstm
                             if lstm_units is None or 0 the LSTM layer is skipped
-        concat_lstm_output (bool) -- if True, the outputs of all LSTM cells 
-                                     are concatenated and fed to the next layer
-                                     if False, only the last output is fed to the next layer
+        combine_mode (str) -- specifies how the encoding of each image in the sequence 
+                              is to be combined. Supports:
+                                  concat : outputs are stacked on top of one another
+                                  last : only last hidden state is returned
+                                  attention : an attention mechanism is used to combine the hidden states
+                              
         fcn_layers (list) -- list specifying Dense layers
                              example element: {units: 1024}
     # Returns
@@ -54,12 +53,12 @@ def build_model(
     l2_reg = l2(l2_regularization)
     
     # Build a model with the functional API
-    inputs = Input(input_shape)
+    inputs = ll.Input(input_shape)
     x = inputs
     
     # Reshape entry if needed
     if len(input_shape) == 3:
-        x = Reshape([1] + input_shape)(x)
+        x = ll.Reshape([1] + input_shape)(x)
     elif len(input_shape) < 3:
         raise ValueError(f"Input shape {input_shape} not supported")
 
@@ -71,7 +70,7 @@ def build_model(
         use_maxpool = cnn_layer['use_maxpool']
 
         # build cnn_layer
-        x = TimeDistributed(Conv2D(
+        x = ll.TimeDistributed(ll.Conv2D(
                 filters, 
                 kernel_size, 
                 strides=(1, 1), 
@@ -91,7 +90,7 @@ def build_model(
         
         # add maxpool if needed
         if use_maxpool:
-            x = TimeDistributed(MaxPooling2D(
+            x = ll.TimeDistributed(ll.MaxPooling2D(
                     pool_size=(2, 2), 
                     strides=None, 
                     padding='valid', 
@@ -99,7 +98,7 @@ def build_model(
                 ), name=f'maxpool_{i}')(x)
         
         if use_batchnorm:
-            x = TimeDistributed(BatchNormalization(
+            x = ll.TimeDistributed(ll.BatchNormalization(
                     axis=-1, 
                     momentum=0.99, 
                     epsilon=0.001, 
@@ -116,12 +115,12 @@ def build_model(
                 ), name=f'batchnorm_{i}')(x)
 
     
-    x = TimeDistributed(Flatten(), name='flatten')(x)
-    x = TimeDistributed(Dropout(dropout_rate), name='dropout')(x)
+    x = ll.TimeDistributed(ll.Flatten(), name='flatten')(x)
+    x = ll.TimeDistributed(ll.Dropout(dropout_rate), name='dropout')(x)
 
     # LSTM feature combinator
     if lstm_units is not None and lstm_units > 0:
-        x = LSTM(
+        x = ll.LSTM(
                 lstm_units, 
                 activation='tanh', 
                 recurrent_activation='hard_sigmoid', 
@@ -140,15 +139,24 @@ def build_model(
                 dropout=dropout_rate, 
                 recurrent_dropout=0.0, 
                 implementation=1, 
-                return_sequences=concat_lstm_output, 
+                return_sequences=True, 
                 return_state=False, 
                 go_backwards=False, 
                 stateful=False, 
                 unroll=False
             )(x)
     
-    if concat_lstm_output:
-        x = Flatten()(x)
+    # Combine output of each sequence
+    if combine_mode == 'concat':
+        x = ll.Flatten()(x)
+    elif combine_mode == 'last':
+        x = ll.Lambda(lambda x : x[-1])(x)
+    elif combine_mode == 'attention':
+        attention = ll.TimeDistributed(ll.Dense(1))(x)
+        attention = ll.Flatten()(attention)
+        attention = ll.Softmax()(attention)
+        x = ll.dot([x, attention], axes=[-2, -1])
+    else: raise ValueError(f"Combine mode {combine_mode} not supported")
     
     # FCN classifier    
     for fcn_layer in fcn_layers:
@@ -156,7 +164,7 @@ def build_model(
         units = fcn_layer['units']
         
         # build layer
-        x = Dense(
+        x = ll.Dense(
                 units, 
                 activation=activation_function, 
                 use_bias=True, 
@@ -169,10 +177,10 @@ def build_model(
                 bias_constraint=None
             )(x)
         
-        x = Dropout(dropout_rate)(x)
+        x = ll.Dropout(dropout_rate)(x)
 
     
-    prediction = Dense(num_classes, activation='softmax')(x)
+    prediction = ll.Dense(num_classes, activation='softmax')(x)
     
     # Build model
     model = Model(inputs=inputs, outputs=prediction)

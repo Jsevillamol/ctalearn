@@ -56,6 +56,9 @@ data_config:
         min_imgs_per_seq: 4
         # max_imgs_per_seq: truncates sequences bigger than this
         max_imgs_per_seq: 4
+        # CAUTION: If using concat combine mode, min_imgs_per_seq must be equal to max_imgs_per_seq
+        # and both of them must be
+        
         # indicates if padding should be added before or after the original sequence
         # supported modes: post, pre
         sequence_padding: post
@@ -135,10 +138,12 @@ model_config:
     # lstm_units: dimensionality of output of each LSTM cell
     #             if null or 0 the LSTM is skipped
     lstm_units: 2048
-    # concat_lstm_output: 
-    #   if true, the output of each LSTM cell is concatenated and fed to the next layer
-    #   if false, only the output of the last LSTM cell is fed to the next layer
-    concat_lstm_output: true
+    # combine_mode : specifies how the encoding of each image in the sequence 
+    #                is to be combined. Supports:
+    #                    concat : outputs are stacked on top of one another
+    #                    last : only last hidden state is returned
+    #                    attention : an attention mechanism is used to combine the hidden states
+    combine_mode: attention
     
     # fcn_layers: Dense layers
     fcn_layers:
