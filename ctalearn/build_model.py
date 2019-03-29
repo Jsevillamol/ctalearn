@@ -150,7 +150,7 @@ def build_model(
     if combine_mode == 'concat':
         x = ll.Flatten()(x)
     elif combine_mode == 'last':
-        x = ll.Lambda(lambda x : x[-1])(x)
+        x = ll.Lambda(lambda x : x[:,-1,...])(x)
     elif combine_mode == 'attention':
         attention = ll.TimeDistributed(ll.Dense(1))(x)
         attention = ll.Flatten()(attention)

@@ -14,7 +14,7 @@ data_config:
     img_size: [108, 108]
     
     # selected_tel_types: list of telescopes whose images will be loaded
-    # supported types: 'LST', 'MSTS'
+    # supported types: 'LST', 'MSTF'
     selected_tel_types: ['LST']
     
     # data_type: select between loading single images or sequences from the same event

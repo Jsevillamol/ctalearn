@@ -24,9 +24,9 @@ plt.switch_backend('agg')
 import random
 import numpy as np
 import tensorflow as tf
-from tensorflow.python.keras.models import load_model
-from tensorflow.python.keras.callbacks import Callback, TensorBoard, ModelCheckpoint, EarlyStopping, CSVLogger
-from tensorflow.python.keras.optimizers import Adam
+from tensorflow.keras.models import load_model
+from tensorflow.keras.callbacks import Callback, TensorBoard, ModelCheckpoint, EarlyStopping, CSVLogger
+from tensorflow.keras.optimizers import Adam
 
 from ctalearn.build_model import build_model
 from ctalearn.summarize import summarize_multi_results

@@ -16,7 +16,7 @@ import tables
 import pandas as pd
 import numpy as np
 
-from tensorflow.python.keras.utils import Sequence, to_categorical
+from tensorflow.keras.utils import Sequence, to_categorical
 
 from ctalearn.data.image_mapping import ImageMapper
 from ctalearn.data.data_processing import DataProcessor
