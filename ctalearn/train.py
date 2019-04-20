@@ -18,9 +18,6 @@ from functools import reduce
 from collections import MutableMapping
 from contextlib import suppress
 
-import matplotlib.pyplot as plt
-plt.switch_backend('agg')
-
 import random
 import numpy as np
 import tensorflow as tf
@@ -29,7 +26,7 @@ from tensorflow.keras.optimizers import Adam
 
 from ctalearn.build_model import build_model
 from ctalearn.summarize import summarize_multi_results
-from ctalearn.keras_utils import auroc, get_callbacks
+from ctalearn.keras_utils import auroc, get_callbacks, plot_history
 from ctalearn.data.data_loading import DataManager
 
 def train(config, model_file=None, train_dir='.'):
@@ -151,13 +148,7 @@ def train(config, model_file=None, train_dir='.'):
                 callbacks=[early_cb]
                 )
         # plot single batch progress
-        plt.plot(single_batch_history.history['loss'])
-        plt.title('model loss')
-        plt.ylabel('loss')
-        plt.xlabel('epoch')
-        plt.legend(['train'], loc='upper left')
-        plt.savefig(f'{train_dir}/history_single_batch_loss.png')
-        plt.clf()
+        plot_history(single_batch_history, 'loss', f'{train_dir}/history_single_batch_loss.png')
     
     # Train the model
     logging.info("Starting training")
@@ -191,25 +182,11 @@ def train(config, model_file=None, train_dir='.'):
     
     # Plot training history
     # summarize history for loss
-    plt.plot(history.history['loss'])
-    plt.plot(history.history['val_loss'])
-    plt.title('model loss')
-    plt.ylabel('loss')
-    plt.xlabel('epoch')
-    plt.legend(['train', 'val'], loc='upper left')
-    plt.savefig(f'{train_dir}/history_loss.png')
-    plt.clf()
+    plot_history(history, 'loss', f'{train_dir}/history_loss.png')
     
     # summarize history for other metrics
     for metric in metrics_names:
-        plt.plot(history.history[metric])
-        plt.plot(history.history[f'val_{metric}'])
-        plt.title(f'model {metric}')
-        plt.ylabel(metric)
-        plt.xlabel('epoch')
-        plt.legend(['train', 'val'], loc='upper left')
-        plt.savefig(f'{train_dir}/history_{metric}.png')
-        plt.clf()
+        plot_history(history, metric, f'{train_dir}/history_{metric}.png')
     
     # After every training session we need to clear the tf session
     # to avoid OOM errors when running multiple training sessions

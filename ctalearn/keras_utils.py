@@ -14,6 +14,9 @@ import tensorflow.keras.backend as K
 import logging
 import signal
 
+import matplotlib.pyplot as plt
+plt.switch_backend('agg')
+
 # callbacks
 def get_callbacks(train_config, train_dir):
     
@@ -133,7 +136,18 @@ def recall_threshold(threshold = 0.5):
         recall_ratio = true_positives / (possible_positives + K.epsilon())
         return recall_ratio
     return recall
-    
+
+# Plots
+def plot_history(history, metric, path):
+    plt.plot(history.history['loss'])
+    plt.plot(history.history[f'val_{metric}'])
+    plt.title(f'model {metric}')
+    plt.ylabel(metric)
+    plt.xlabel('epoch')
+    plt.legend(['train', 'val'], loc='upper left')
+    plt.savefig(path)
+    plt.clf()
+
 # QUICK TESTS
 if __name__ == "__main__":
     precision = precision_threshold()
