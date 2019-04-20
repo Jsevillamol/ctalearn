@@ -6,7 +6,7 @@ Created on Sat Oct 27 10:22:03 2018
 @author: jsevillamol
 """
 
-import os, logging, signal
+import os, logging
 import argparse, time
 from datetime import timedelta
 import yaml
@@ -25,12 +25,11 @@ import random
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.models import load_model
-from tensorflow.keras.callbacks import Callback, TensorBoard, ModelCheckpoint, EarlyStopping, CSVLogger
 from tensorflow.keras.optimizers import Adam
 
 from ctalearn.build_model import build_model
 from ctalearn.summarize import summarize_multi_results
-from ctalearn.keras_utils import auroc
+from ctalearn.keras_utils import auroc, get_callbacks
 from ctalearn.data.data_loading import DataManager
 
 def train(config, model_file=None, train_dir='.'):
@@ -68,10 +67,6 @@ def train(config, model_file=None, train_dir='.'):
     
     loss = train_config.get('loss')
     metrics_names = train_config.get('metrics')
-    
-    stop_early = train_config.get('stop_early')
-    min_delta = train_config.get('min_delta', None)
-    patience = train_config.get('patience', None)
     
     class_weight = train_config.get('class_weight')
     save_model = train_config.get('save_model')
@@ -118,64 +113,7 @@ def train(config, model_file=None, train_dir='.'):
     logging.info("Model compiled")
     
     # Callbacks
-    callbacks = []
-    
-    # Monitors the SIGINT (ctrl + C) to safely stop training when it is sent
-    
-    class SafeStop(Callback):
-        """Callback that terminates training when the flag is raised.
-        """
-        def __init__(self): 
-            self.safestop_flag = False
-        def on_epoch_end(self, batch, logs=None):
-            if self.safestop_flag:    
-                self.model.stop_training = True
-                self.safestop_flag = False
-    safeStop = SafeStop()
-                
-    def handler(signum, frame):
-        logging.info('SIGINT signal received. Training will finish after this epoch')
-        safeStop.safestop_flag = True
-    
-    signal.signal(signal.SIGINT, handler) # We assign a specific handler for the SIGINT signal
-    
-    callbacks.append(safeStop)
-    
-    # Creates event files for tensorboard during training
-    tensorboard_cb = TensorBoard(
-            log_dir=f'{train_dir}/logs', 
-            histogram_freq=0, 
-            batch_size=batch_size, 
-            write_graph=True, 
-            write_grads=True, 
-            write_images=False
-            )
-    callbacks.append(tensorboard_cb)
-    
-    if False:
-        # Creates checkpoints of the best models found
-        checkpoint_cb = ModelCheckpoint(
-                filepath=train_dir + '/model.{epoch:02d}-{val_loss:.2f}.h5', 
-                monitor='val_loss', 
-                verbose=0, 
-                save_best_only=True, 
-                save_weights_only=False, 
-                mode='auto', period=1)
-        callbacks.append(checkpoint_cb)
-    
-    if stop_early is not None:
-        # Monitors rate of improvement on a chosen metric and stops training if it enters a plateau
-        early_cb = EarlyStopping(
-                monitor= stop_early, 
-                min_delta= min_delta, 
-                patience= patience, 
-                verbose=0, 
-                mode='auto')
-        callbacks.append(early_cb)
-    
-    # Logs the metrics after each epoch to a csv file
-    csv_logger = CSVLogger(f'{train_dir}/training_history.csv')
-    callbacks.append(csv_logger)
+    callbacks = get_callbacks(train_config, train_dir)
 
     # Create data manager
     dataManager = DataManager(**data_config)
@@ -198,7 +136,7 @@ def train(config, model_file=None, train_dir='.'):
     # Pretrain the model on a single batch
     if fit_batch_first:
         logging.info("Fitting single batch first")
-        early_cb = EarlyStopping(
+        early_cb = tf.keras.callbacks.EarlyStopping(
                 monitor= 'loss', 
                 min_delta= 0, 
                 patience= 1, 
