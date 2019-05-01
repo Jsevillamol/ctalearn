@@ -211,11 +211,11 @@ class DataManager():
         """
         if selected_indices is not None and self._data_type == 'array':
             # Select chosen rows of event and image index
-            event_index_df = self._event_index_df.ix[selected_indices]
+            event_index_df = self._event_index_df.iloc[selected_indices]
             image_indices = event_index_df.image_indices.sum()
-            image_index_df = self._image_index_df.ix[image_indices]
+            image_index_df = self._image_index_df.iloc[image_indices]
         elif selected_indices is not None and self._data_type == 'single_tel':
-            image_index_df = self._image_index_df.ix[selected_indices]
+            image_index_df = self._image_index_df.iloc[selected_indices]
             event_index_df = self._event_index_df
         else:
             # Use the whole dataset
