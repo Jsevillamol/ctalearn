@@ -120,6 +120,25 @@ def build_model(
 
     # LSTM feature combinator
     if lstm_units is not None and lstm_units > 0:
+        x = ll.CuDNNLSTM(
+                lstm_units,
+                kernel_initializer='glorot_uniform',
+                recurrent_initializer='orthogonal',
+                bias_initializer='zeros',
+                unit_forget_bias=True,
+                kernel_regularizer=l2_reg,
+                recurrent_regularizer=l2_reg,
+                bias_regularizer=l2_reg,
+                activity_regularizer=None,
+                kernel_constraint=None,
+                recurrent_constraint=None,
+                bias_constraint=None,
+                return_sequences=True,
+                return_state=False,
+                go_backwards=False,
+                stateful=False
+                )(x)
+        """
         x = ll.LSTM(
                 lstm_units, 
                 activation='tanh', 
@@ -145,6 +164,7 @@ def build_model(
                 stateful=False, 
                 unroll=False
             )(x)
+        """
     
     # Combine output of each sequence
     if combine_mode == 'concat':
