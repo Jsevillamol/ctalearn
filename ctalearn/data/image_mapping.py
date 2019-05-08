@@ -61,9 +61,7 @@ class ImageMapper():
 
     def __init__(self,
                  camera_types=None,
-                 hex_conversion_algorithm=None,
-                 padding=None,
-                 interpolation_image_shape=None,
+                 hex_conversion_algorithm='oversampling',
                  mask_interpolation=False,
                  use_peak_times=False):
         """
@@ -102,17 +100,11 @@ class ImageMapper():
         if self.camera_types is None:
             self.camera_types = [cam for cam in self.image_shapes]
         # Hexagonal conversion algorithm
-        if hex_conversion_algorithm is None:
-            hex_conversion_algorithm = {}
-        self.hex_conversion_algorithm = {**{c: 'oversampling' for c in self.camera_types}, **hex_conversion_algorithm}
+        self.hex_conversion_algorithm = {c: hex_conversion_algorithm for c in self.camera_types}
         # Interpolation image shape
-        if interpolation_image_shape is None:
-            interpolation_image_shape = {}
-        self.interpolation_image_shape = {**{c: self.image_shapes[c] for c in self.camera_types}, **interpolation_image_shape}
+        self.interpolation_image_shape = {c: self.image_shapes[c] for c in self.camera_types}
         # Padding
-        if padding is None:
-            padding = {}
-        self.padding = {**{c: 0 for c in self.camera_types}, **padding}
+        self.padding = {c: 0 for c in self.camera_types}
         # Mask interpolation
         self.mask = False
         if mask_interpolation is True:

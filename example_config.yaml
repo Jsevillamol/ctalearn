@@ -57,7 +57,6 @@ data_config:
         # max_imgs_per_seq: truncates sequences bigger than this
         max_imgs_per_seq: 4
         # CAUTION: If using concat combine mode, min_imgs_per_seq must be equal to max_imgs_per_seq
-        # and both of them must be
         
         # indicates if padding should be added before or after the original sequence
         # supported modes: post, pre

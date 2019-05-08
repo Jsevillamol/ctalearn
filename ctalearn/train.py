@@ -24,6 +24,9 @@ import tensorflow as tf
 from tensorflow.keras.models import load_model
 from tensorflow.keras.optimizers import Adam
 
+import matplotlib.pyplot as plt
+plt.switch_backend('agg')
+
 from ctalearn.build_model import build_model
 from ctalearn.summarize import summarize_multi_results
 from ctalearn.keras_utils import auroc, get_callbacks, plot_history
@@ -148,7 +151,12 @@ def train(config, model_file=None, train_dir='.'):
                 callbacks=[early_cb]
                 )
         # plot single batch progress
-        plot_history(single_batch_history, 'loss', f'{train_dir}/history_single_batch_loss.png')
+        plt.plot(single_batch_history.history['loss'])
+        plt.title(f'model single batch loss')
+        plt.ylabel('loss')
+        plt.xlabel('epoch')
+        plt.savefig(f'{train_dir}/history_single_batch_loss.png')
+        plt.clf()
     
     # Train the model
     logging.info("Starting training")
