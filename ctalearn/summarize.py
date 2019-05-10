@@ -7,6 +7,7 @@ Created on Sun Dec 30 18:19:55 2018
 """
 
 import os
+import argparse
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -62,11 +63,26 @@ def summarize_multi_results():
     ax.set_xticks(bins)
     plt.savefig('n_epochs.png')
     plt.clf()
-    
+
+def summarize_run_results(run_csv_fn, train_dir='.', metrics = ['loss', 'acc', 'auc']):
+    df = pd.read_csv(run_csv_fn)
+    for metric in metrics:
+        df.plot.line(x='epoch', y = [metric, f'val_{metric}'])
+        plt.savefig(f'{train_dir}/history_{metric}.png')
+        plt.clf()
             
 ########################
 # LAUNCH SCRIPT
 ########################
 
 if __name__ == "__main__":
-    summarize_multi_results()
+    parser = argparse.ArgumentParser(
+              description=("Summarize the results of a training session"))
+
+    parser.add_argument('path', default=None, help="")
+    args = parser.parse_args()
+
+    if args.path is None:
+        summarize_multi_results()
+    else: 
+        summarize_run_results(args.path)

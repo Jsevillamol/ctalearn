@@ -28,8 +28,8 @@ import matplotlib.pyplot as plt
 plt.switch_backend('agg')
 
 from ctalearn.build_model import build_model
-from ctalearn.summarize import summarize_multi_results
-from ctalearn.keras_utils import auroc, get_callbacks, plot_history
+from ctalearn.summarize import summarize_multi_results, summarize_run_results
+from ctalearn.keras_utils import auroc, get_callbacks
 from ctalearn.data.data_loading import DataManager
 
 def train(config, model_file=None, train_dir='.'):
@@ -189,12 +189,8 @@ def train(config, model_file=None, train_dir='.'):
         model.save(model_fn)
     
     # Plot training history
-    # summarize history for loss
-    plot_history(history, 'loss', f'{train_dir}/history_loss.png')
-    
-    # summarize history for other metrics
-    for metric in metrics_names:
-        plot_history(history, metric, f'{train_dir}/history_{metric}.png')
+    training_csv_path = f'{train_dir}/training_history.csv'
+    summarize_run_results(training_csv_path, train_dir, ['loss'] + metrics_names)
     
     # After every training session we need to clear the tf session
     # to avoid OOM errors when running multiple training sessions
