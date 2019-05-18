@@ -21,7 +21,7 @@ data_config:
     # supported modes: 'single_tel', 'array'
     data_type: 'array'
     
-    # min_triggers_per_event: filter events with few telescope triggers 
+    # min_triggers_per_event: filter events out with less telescopes triggered
     min_triggers_per_event: 1
     
     # image_mapping_config: configuration for the mapping of images to numpy arrays
