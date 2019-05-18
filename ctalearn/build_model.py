@@ -138,33 +138,6 @@ def build_model(
                 go_backwards=False,
                 stateful=False
                 )(x)
-        """
-        x = ll.LSTM(
-                lstm_units, 
-                activation='tanh', 
-                recurrent_activation='hard_sigmoid', 
-                use_bias=True, 
-                kernel_initializer='glorot_uniform', 
-                recurrent_initializer='orthogonal', 
-                bias_initializer='zeros', 
-                unit_forget_bias=True, 
-                kernel_regularizer=l2_reg, 
-                recurrent_regularizer=l2_reg, 
-                bias_regularizer=l2_reg, 
-                activity_regularizer=None, 
-                kernel_constraint=None, 
-                recurrent_constraint=None, 
-                bias_constraint=None, 
-                dropout=dropout_rate, 
-                recurrent_dropout=0.0, 
-                implementation=1, 
-                return_sequences=True, 
-                return_state=False, 
-                go_backwards=False, 
-                stateful=False, 
-                unroll=False
-            )(x)
-        """
     
     # Combine output of each sequence
     if combine_mode == 'concat':
@@ -172,7 +145,7 @@ def build_model(
     elif combine_mode == 'last':
         x = ll.Lambda(lambda x : x[:,-1,...])(x)
     elif combine_mode == 'attention':
-        attention = ll.TimeDistributed(ll.Dense(1))(x)
+        attention = ll.TimeDistributed(ll.Dense(1), name='attention_score')(x)
         attention = ll.Flatten()(attention)
         attention = ll.Softmax()(attention)
         x = ll.dot([x, attention], axes=[-2, -1])
