@@ -1,0 +1,72 @@
+data_config:
+  channels:
+  - image_charge
+  data_type: array
+  file_list_fn: /data2/deeplearning/ctlearn/tests/prototype_files_class_balanced.txt
+  image_mapping_config:
+    hex_conversion_algorithm: oversampling
+  img_size:
+  - 112
+  - 112
+  min_triggers_per_event: 1
+  preprocessing_config:
+    event_order_reverse: false
+    event_order_type: size
+    max_imgs_per_seq: 8
+    min_imgs_per_seq: 1
+    normalization: null
+    resize_mode: interpolate
+    sequence_padding: pre
+    sequence_truncating: post
+  selected_tel_types:
+  - MSTF
+model_config:
+  activation_function: relu
+  cnn_layers:
+  - filters: 32
+    kernel_size: 3
+    use_maxpool: true
+  - filters: 32
+    kernel_size: 3
+    use_maxpool: true
+  - filters: 64
+    kernel_size: 3
+    use_maxpool: true
+  - filters: 128
+    kernel_size: 3
+    use_maxpool: true
+  combine_mode: attention
+  dropout_rate: 0.0
+  fcn_layers:
+  - units: 1024
+  - units: 512
+  input_shape:
+  - null
+  - 112
+  - 112
+  - 1
+  l2_regularization: 0.0
+  lstm_units: null
+  num_classes: 2
+  use_batchnorm: false
+train_config:
+  batch_size: 16
+  class_weight: false
+  decay: 0.0
+  epochs: 10
+  epsilon: 1.0e-08
+  fit_batch_first: true
+  learning_rate: 1.0e-05
+  loss: categorical_crossentropy
+  metrics:
+  - acc
+  - auc
+  min_delta: 0
+  optimizer: adam
+  patience: 3
+  save_model: false
+  seed: 1111
+  shuffle: true
+  stop_early: loss
+  train_split: 0.9
+  val_split: 0.1

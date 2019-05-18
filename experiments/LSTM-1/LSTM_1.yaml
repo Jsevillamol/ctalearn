@@ -1,0 +1,76 @@
+data_config:
+    file_list_fn: /data2/deeplearning/ctlearn/tests/prototype_files_class_balanced.txt
+    
+    channels: [image_charge]
+    
+    img_size: [112, 112]
+    
+    selected_tel_types: ['MSTF']
+    
+    data_type: 'array'
+    
+    min_triggers_per_event: 1
+    
+    image_mapping_config:
+        hex_conversion_algorithm: oversampling
+    
+    preprocessing_config:
+        normalization: null
+        
+        resize_mode: 'interpolate'
+        
+        event_order_type: size
+        event_order_reverse: false
+        
+        min_imgs_per_seq: 1
+        max_imgs_per_seq: 8
+
+        sequence_padding: pre
+        sequence_truncating: post
+                 
+train_config:
+    epochs: 10         
+    batch_size: 16     
+    train_split: 0.9   
+    val_split: 0.1
+    seed: 1111       
+    shuffle: true     
+    
+    optimizer: adam
+    multi_learning_rate: [1.0e-04, 1.0e-05]
+    epsilon:  1.0e-08
+    decay: 0.0
+    
+    loss: 'categorical_crossentropy'
+    metrics: [acc, auc]
+    
+    stop_early: loss
+    min_delta: 0
+    patience: 3
+    
+    class_weight: false
+
+    multi_fit_batch_first: [false, true]
+    
+    save_model: false
+
+model_config:
+    input_shape: [null, 112, 112, 1]
+    num_classes: 2
+    activation_function: 'relu'
+    dropout_rate: 0.0
+    multi_use_batchnorm: [false, true]
+    l2_regularization: 0.0
+    
+    cnn_layers:
+        - {filters: 32,  kernel_size: 3, use_maxpool: true}
+        - {filters: 32,  kernel_size: 3, use_maxpool: true}
+        - {filters: 64,  kernel_size: 3, use_maxpool: true}
+        - {filters: 128, kernel_size: 3, use_maxpool: true}
+    
+    lstm_units: 2048
+    combine_mode: last
+    
+    fcn_layers:
+        - {units: 1024}
+        - {units: 512}

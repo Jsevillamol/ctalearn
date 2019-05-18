@@ -2,5 +2,6 @@ ctalearn/data/pixel_pos_files/
 
 *.h5
 *.log
-*.png
 *.json
+*.talos
+*.~lock.*
