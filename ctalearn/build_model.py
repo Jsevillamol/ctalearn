@@ -133,7 +133,7 @@ def build_model(
                 kernel_constraint=None,
                 recurrent_constraint=None,
                 bias_constraint=None,
-                return_sequences=True,
+                return_sequences=(combine_mode!='last'),
                 return_state=False,
                 go_backwards=False,
                 stateful=False
@@ -143,7 +143,8 @@ def build_model(
     if combine_mode == 'concat':
         x = ll.Flatten()(x)
     elif combine_mode == 'last':
-        x = ll.Lambda(lambda x : x[:,-1,...])(x)
+        if lstm_units is None or lstm_units == 0:    # if no LSTM was used
+            x = ll.Lambda(lambda x : x[:,-1,...])(x) # we extract the last element
     elif combine_mode == 'attention':
         attention = ll.TimeDistributed(ll.Dense(1), name='attention_score')(x)
         attention = ll.Flatten()(attention)
